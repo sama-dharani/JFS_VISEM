@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Faculty Timetable</title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        table {
+            width: 80%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            border: 1px solid black;
+            padding: 8px;
+            text-align: center;
+        }
+        th {
+            background: lightblue;
+        }
+        .faculty-title {
+            font-weight: bold;
+            font-size: 20px;
+            margin-top: 30px;
+        }
+        .msg {
+            font-size: 16px;
+            color: gray;
+            margin-top: 20px;
+        }
+        input, button {
+            padding: 6px 10px;
+            margin: 5px;
+        }
+    </style>
+</head>
+
+<body>
+
+<h2>Faculty Timetable</h2>
+
+<input type="file" id="csvFile" accept=".csv">
+
+<br><br>
+
+<label><b>Enter Faculty Name:</b></label>
+<input type="text" id="facultySearch" placeholder="Type faculty name">
+<button onclick="searchFaculty()">Search</button>
+
+<div id="tables">
+    <div class="msg">Please upload CSV and enter faculty name to view timetable</div>
+</div>
+
+<script>
+let fullTimetable = {};
+
+document.getElementById("csvFile").addEventListener("change", function () {
+    Papa.parse(this.files[0], {
+        header: true,
+        skipEmptyLines: true,
+        complete: function (result) {
+            processCSV(result.data);
+        }
+    });
+});
+
+function processCSV(data) {
+    const timetable = {};
+
+    data.forEach(row => {
+        const faculty = row["FACULTY"];
+        const day = row["DAY"];
+        const session = row["SESSION"];
+        const batch = row["BATCH"];
+        const course = row["COURSE"];
+        const room = row["ROOM"];
+
+        if (!faculty || !day || !session) return;
+
+        if (!timetable[faculty]) timetable[faculty] = {};
+        if (!timetable[faculty][day]) {
+            timetable[faculty][day] = { FN: "", AN: "" };
+        }
+
+        timetable[faculty][day][session] =
+            `Batch: ${batch}<br>${course}<br>Room: ${room}`;
+    });
+
+    fullTimetable = timetable;
+}
+
+function searchFaculty() {
+    const name = document.getElementById("facultySearch").value.trim().toLowerCase();
+    const container = document.getElementById("tables");
+    container.innerHTML = "";
+
+    if (!name) {
+        container.innerHTML = `<div class="msg">Please enter faculty name</div>`;
+        return;
+    }
+
+    const filtered = {};
+
+    for (const faculty in fullTimetable) {
+        if (faculty.toLowerCase() === name) {
+            filtered[faculty] = fullTimetable[faculty];
+        }
+    }
+
+    if (Object.keys(filtered).length === 0) {
+        container.innerHTML = `<div class="msg">No faculty found</div>`;
+        return;
+    }
+
+    buildTables(filtered);
+}
+
+function buildTables(timetable) {
+    const container = document.getElementById("tables");
+    const days = ["MON", "TUE", "WED", "THU", "FRI", "SAT"];
+
+    for (const faculty in timetable) {
+        const title = document.createElement("div");
+        title.className = "faculty-title";
+        title.innerHTML = `Faculty: ${faculty}`;
+
+        const table = document.createElement("table");
+
+        let html = `
+            <tr>
+                <th>DAY</th>
+                <th>FN</th>
+                <th rowspan="7">L<br>U<br>N<br>C<br>H</th>
+                <th>AN</th>
+            </tr>
+        `;
+
+        days.forEach(day => {
+            const fn = timetable[faculty][day]?.FN || "";
+            const an = timetable[faculty][day]?.AN || "";
+            html += `
+                <tr>
+                    <td>${day}</td>
+                    <td>${fn}</td>
+                    <td>${an}</td>
+                </tr>
+            `;
+        });
+
+        table.innerHTML = html;
+        container.appendChild(title);
+        container.appendChild(table);
+    }
+}
+</script>
+
+</body>
+</html>
