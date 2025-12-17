@@ -1,8 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Faculty Timetable</title>
+    <title>Batch-wise Timetable</title>
 
+    <!-- PapaParse for CSV -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 
     <style>
@@ -12,7 +13,7 @@
         table {
             width: 80%;
             border-collapse: collapse;
-            margin: 20px 0;
+            margin: 15px 0;
         }
         th, td {
             border: 1px solid black;
@@ -20,141 +21,115 @@
             text-align: center;
         }
         th {
-            background: lightblue;
+            background-color: lightblue;
         }
-        .faculty-title {
-            font-weight: bold;
+        .batch-title {
             font-size: 20px;
-            margin-top: 30px;
-        }
-        .msg {
-            font-size: 16px;
-            color: gray;
+            font-weight: bold;
             margin-top: 20px;
         }
         input, button {
-            padding: 6px 10px;
-            margin: 5px;
+            padding: 6px;
+            margin: 5px 0;
         }
     </style>
 </head>
 
 <body>
 
-<h2>Faculty Timetable</h2>
+<h2>Batch-wise Timetable</h2>
 
-<input type="file" id="csvFile" accept=".csv">
+<!-- Upload CSV -->
+<input type="file" id="csvFile" accept=".csv"><br><br>
 
-<br><br>
+<!-- Batch input -->
+<input type="text" id="batchInput" placeholder="Enter Batch (e.g. VI-A)">
+<button onclick="showBatchTimetable()">Show Timetable</button>
 
-<label><b>Enter Faculty Name:</b></label>
-<input type="text" id="facultySearch" placeholder="Type faculty name">
-<button onclick="searchFaculty()">Search</button>
-
-<div id="tables">
-    <div class="msg">Please upload CSV and enter faculty name to view timetable</div>
-</div>
+<div id="tables"></div>
 
 <script>
-let fullTimetable = {};
+let csvData = [];
 
 document.getElementById("csvFile").addEventListener("change", function () {
     Papa.parse(this.files[0], {
         header: true,
         skipEmptyLines: true,
         complete: function (result) {
-            processCSV(result.data);
+            csvData = result.data;
+            alert("CSV file loaded successfully");
         }
     });
 });
 
-function processCSV(data) {
-    const timetable = {};
-
-    data.forEach(row => {
-        const faculty = row["FACULTY"];
-        const day = row["DAY"];
-        const session = row["SESSION"];
-        const batch = row["BATCH"];
-        const course = row["COURSE"];
-        const room = row["ROOM"];
-
-        if (!faculty || !day || !session) return;
-
-        if (!timetable[faculty]) timetable[faculty] = {};
-        if (!timetable[faculty][day]) {
-            timetable[faculty][day] = { FN: "", AN: "" };
-        }
-
-        timetable[faculty][day][session] =
-            `Batch: ${batch}<br>${course}<br>Room: ${room}`;
-    });
-
-    fullTimetable = timetable;
-}
-
-function searchFaculty() {
-    const name = document.getElementById("facultySearch").value.trim().toLowerCase();
+function showBatchTimetable() {
+    const batchName = document.getElementById("batchInput").value.trim().toUpperCase();
     const container = document.getElementById("tables");
     container.innerHTML = "";
 
-    if (!name) {
-        container.innerHTML = `<div class="msg">Please enter faculty name</div>`;
+    if (!batchName) {
+        alert("Please enter batch name");
         return;
     }
 
-    const filtered = {};
-
-    for (const faculty in fullTimetable) {
-        if (faculty.toLowerCase() === name) {
-            filtered[faculty] = fullTimetable[faculty];
-        }
-    }
-
-    if (Object.keys(filtered).length === 0) {
-        container.innerHTML = `<div class="msg">No faculty found</div>`;
-        return;
-    }
-
-    buildTables(filtered);
-}
-
-function buildTables(timetable) {
-    const container = document.getElementById("tables");
     const days = ["MON", "TUE", "WED", "THU", "FRI", "SAT"];
 
-    for (const faculty in timetable) {
-        const title = document.createElement("div");
-        title.className = "faculty-title";
-        title.innerHTML = `Faculty: ${faculty}`;
+    // Initialize timetable
+    let timetable = {};
+    days.forEach(day => timetable[day] = { FN: "", AN: "" });
 
-        const table = document.createElement("table");
+    csvData.forEach(row => {
+        if (row["BATCH"] && row["BATCH"].toUpperCase() === batchName) {
+            const day = row["DAY"]?.toUpperCase();
+            const session = row["SESSION"]?.toUpperCase(); // FN / AN
 
-        let html = `
+            if (timetable[day] && (session === "FN" || session === "AN")) {
+                timetable[day][session] =
+                    `${row["COURSE"]}<br>
+                     Room: ${row["ROOM"]}<br>
+                     Faculty: ${row["FACULTY"]}`;
+            }
+        }
+    });
+
+    // Check if batch exists
+    const hasData = Object.values(timetable)
+        .some(d => d.FN !== "" || d.AN !== "");
+
+    if (!hasData) {
+        container.innerHTML = "<p>No timetable found for this batch</p>";
+        return;
+    }
+
+    // Title
+    const title = document.createElement("div");
+    title.className = "batch-title";
+    title.innerHTML = `Batch: ${batchName}`;
+    container.appendChild(title);
+
+    // Build table
+    let tableHTML = `
+        <table>
             <tr>
                 <th>DAY</th>
                 <th>FN</th>
                 <th rowspan="7">L<br>U<br>N<br>C<br>H</th>
                 <th>AN</th>
             </tr>
+    `;
+
+    days.forEach(day => {
+        tableHTML += `
+            <tr>
+                <td>${day}</td>
+                <td>${timetable[day].FN}</td>
+                <td>${timetable[day].AN}</td>
+            </tr>
         `;
+    });
 
-        days.forEach(day => {
-            const fn = timetable[faculty][day]?.FN || "";
-            const an = timetable[faculty][day]?.AN || "";
-            html += `
-                <tr>
-                    <td>${day}</td>
-                    <td>${fn}</td>
-                    <td>${an}</td>
-                </tr>
-            `;
-        });
-
-        table.innerHTML = html;
-        container.appendChild(title);
-        container.appendChild(table);
-    }
+    tableHTML += "</table>";
+    container.innerHTML += tableHTML;
 }
 </script>
 
